@@ -28,10 +28,10 @@ services:
             - /var/run/docker.sock:/var/run/docker.sock:ro
    
     covidpassapinet:
-        image: ghcr.io/covidpass-org/covidpassapinet:${TAG}
+        image: ghcr.io/covidpass-org/covidpassapinet:${TAG_BACKEND}
         restart: "unless-stopped"
         environment:
-            - Server__AllowedOrigins=https://dev.covidpass.marvinsextro.de
+            - Server__AllowedOrigins=https://${SERVER_URL}
             - Certificates__AppleDeveloperPath=/certs/apple-developer-certificate.pem
             - Certificates__AppleDeveloperPasswordPath=/run/secrets/apple-developer-password
             - Certificates__AppleCaPath=/certs/apple-ca-certificate.pem
@@ -55,7 +55,7 @@ services:
           - apple-developer-password
 
     covidpass:
-        image: ghcr.io/covidpass-org/covidpass:${TAG}
+        image: ghcr.io/covidpass-org/covidpass:${TAG_FRONTEND}
         restart: "unless-stopped"
         environment:
             - NODE_ENV=production
