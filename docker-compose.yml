@@ -1,0 +1,73 @@
+version: "3.3"
+
+services:
+    traefik:
+        image: "traefik:v2.4"
+        command:
+            - "--providers.docker=true"
+            - "--providers.docker.exposedbydefault=false"
+            - "--entrypoints.web.address=:80"
+            - "--entrypoints.websecure.address=:443"
+            - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+            - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+            - "--certificatesresolvers.myresolver.acme.email=marvin.sextro@gmail.com"
+            - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+            - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+            - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+            - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+            - "--providers.file.filename=/conf/traefik-tls.toml"
+            #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+            #- "--log.level=DEBUG"
+        ports:
+            - "80:80"
+            - "443:443"
+            - "8080:8080"
+        volumes:
+            - ./traefik-tls.toml:/conf/traefik-tls.toml
+            - /mnt/docker/letsencrypt:/letsencrypt
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+   
+    covidpassapinet:
+        image: ghcr.io/covidpass-org/covidpassapinet:${TAG}
+        restart: "unless-stopped"
+        environment:
+            - Server__AllowedOrigins=https://dev.covidpass.marvinsextro.de
+            - Certificates__AppleDeveloperPath=/certs/apple-developer-certificate.pem
+            - Certificates__AppleDeveloperPasswordPath=/run/secrets/apple-developer-password
+            - Certificates__AppleCaPath=/certs/apple-ca-certificate.pem
+            - Hashes__IconBlack=9dcdd385e848610f020cf3bfc65ddc413beb5e87
+            - Hashes__IconWhite=8fe995e82fa5fa28178df005a1340ae52dcf60e3
+            - Hashes__Icon2XBlack=4e8a383fd25dc26c686f8ac70f2a251d5bd60979
+            - Hashes__Icon2XWhite=28cbd85eee40f0ac79a1cfe96524a64036c9cb9e
+            - Hashes__LogoBlack=9dcdd385e848610f020cf3bfc65ddc413beb5e87
+            - Hashes__LogoWhite=8fe995e82fa5fa28178df005a1340ae52dcf60e3
+            - Hashes__Logo2XBlack=4e8a383fd25dc26c686f8ac70f2a251d5bd60979
+            - Hashes__Logo2XWhite=28cbd85eee40f0ac79a1cfe96524a64036c9cb9e
+        volumes:
+            - /mnt/docker/secrets/apple-ca-certificate.pem:/certs/apple-ca-certificate.pem
+            - /mnt/docker/secrets/apple-developer-certificate.pem:/certs/apple-developer-certificate.pem
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.covidpass-api.rule=Host(`api.${SERVER_URL}`)"
+            - "traefik.http.routers.covidpass-api.entrypoints=websecure"
+            - "traefik.http.routers.covidpass-api.tls.certresolver=myresolver"
+        secrets:
+          - apple-developer-password
+
+    covidpass:
+        image: ghcr.io/covidpass-org/covidpass:${TAG}
+        restart: "unless-stopped"
+        environment:
+            - NODE_ENV=production
+            - API_BASE_URL=https://api.${SERVER_URL}
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.covidpass.rule=Host(`${SERVER_URL}`)"
+            - "traefik.http.routers.covidpass.entrypoints=websecure"
+            - "traefik.http.routers.covidpass.tls.certresolver=myresolver"
+        depends_on:
+            - covidpassapinet
+
+secrets:
+  apple-developer-password:
+    file: /mnt/docker/secrets/apple-developer-password
