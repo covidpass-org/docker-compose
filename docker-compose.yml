@@ -16,6 +16,8 @@ services:
             - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
             - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
             - "--providers.file.filename=/conf/traefik-tls.toml"
+            - "--metrics.prometheus=true"
+            - "--metrics.prometheus.manualrouting=true"
             #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
             #- "--log.level=DEBUG"
         ports:
@@ -26,6 +28,8 @@ services:
             - ./traefik-tls.toml:/conf/traefik-tls.toml
             - /mnt/docker/letsencrypt:/letsencrypt
             - /var/run/docker.sock:/var/run/docker.sock:ro
+        secrets:
+            - traefik-metrics
    
     covidpassapinet:
         image: ghcr.io/covidpass-org/covidpassapinet:${TAG_BACKEND}
@@ -51,6 +55,12 @@ services:
             - "traefik.http.routers.covidpass-api.rule=Host(`api.${SERVER_URL}`)"
             - "traefik.http.routers.covidpass-api.entrypoints=websecure"
             - "traefik.http.routers.covidpass-api.tls.certresolver=myresolver"
+            - "traefik.http.middlewares.admin-auth-metrics.basicauth.usersfile=/run/secrets/traefik-metrics"
+            - "traefik.http.routers.covidpass-api-metrics.rule=Host(`api.${SERVER_URL}`) && PathPrefix(`/traefik-metrics`)"
+            - "traefik.http.routers.covidpass-api-metrics.entrypoints=websecure"
+            - "traefik.http.routers.covidpass-api-metrics.tls=true"
+            - "traefik.http.routers.covidpass-api-metrics.service=prometheus@internal"
+            - "traefik.http.routers.covidpass-api-metrics.middlewares=admin-auth-metrics"
         secrets:
           - apple-developer-password
 
@@ -71,3 +81,5 @@ services:
 secrets:
   apple-developer-password:
     file: /mnt/docker/secrets/apple-developer-password
+  traefik-metrics:
+    file: /mnt/docker/secrets/traefik-metrics
